@@ -33,7 +33,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt update
-          sudo apt install -yq --no-install-recommends g++-multilib ${{ matrix.compiler_cc }}
+          # Installed g++ (64-bit default) and g++-multilib if 32-bit fallback is still needed
+          sudo apt install -yq --no-install-recommends g++ ${{ matrix.compiler_cc }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -41,12 +42,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           path: extension
 
       - name: Checkout SourceMod ${{ matrix.sourcemod-version }}
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           repository: alliedmodders/sourcemod
           ref: ${{ matrix.sourcemod-version }}
@@ -80,7 +81,8 @@ jobs:
         working-directory: libboost
         run: |
           ./bootstrap.sh --prefix=build --with-libraries=thread,system
-          ./b2 -j8 cflags=-m32 cxxflags=-m32 address-model=32 threading=multi architecture=x86 instruction-set=i686 link=static runtime-link=static
+          # Target 64-bit architecture
+          ./b2 -j8 cflags=-m64 cxxflags=-m64 address-model=64 threading=multi architecture=x86 link=static runtime-link=static
           ./b2 install
 
       - name: Build
@@ -90,13 +92,14 @@ jobs:
           BREAKPAD_SYMBOL_SERVER: ${{ secrets.BREAKPAD_SYMBOL_SERVER }}
         run: |
           mkdir build && cd build
-          python ../configure.py --enable-optimize --symbol-files
+          # Pass --enable-64 or target 64-bit architecture to your configure script
+          python ../configure.py --enable-optimize --symbol-files --enable-64
           ambuild
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}
+          name: ${{ runner.os }}-x64
           path: extension/build/package
 
   release:
@@ -113,19 +116,19 @@ jobs:
         run: |
           version=`echo $GITHUB_REF | sed "s/refs\/tags\///"`
           ls -Rall
-          if [ -d "./Linux/" ]; then
-            cd ./Linux/
-            tar -czf ../${{ github.event.repository.name }}-${version}-linux.tar.gz -T <(\ls -1)
+          if [ -d "./Linux-x64/" ]; then
+            cd ./Linux-x64/
+            tar -czf ../${{ github.event.repository.name }}-${version}-linux-x64.tar.gz -T <(\ls -1)
             cd -
           fi
-          if [ -d "./macOS/" ]; then
-            cd ./macOS/
-            tar -czf ../${{ github.event.repository.name }}-${version}-mac.tar.gz -T <(\ls -1)
+          if [ -d "./macOS-x64/" ]; then
+            cd ./macOS-x64/
+            tar -czf ../${{ github.event.repository.name }}-${version}-mac-x64.tar.gz -T <(\ls -1)
             cd -
           fi
-          if [ -d "./Windows/" ]; then
-            cd ./Windows/
-            tar -czf ../${{ github.event.repository.name }}-${version}-windows.tar.gz -T <(\ls -1)
+          if [ -d "./Windows-x64/" ]; then
+            cd ./Windows-x64/
+            tar -czf ../${{ github.event.repository.name }}-${version}-windows-x64.tar.gz -T <(\ls -1)
             cd -
           fi
 
